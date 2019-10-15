@@ -1,0 +1,8 @@
+ujson
+django
+psycopg2
+pyTelegramBotAPI
+requests[socks]
+transliterate
+aiohttp
+chatbase

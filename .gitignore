@@ -1,4 +1,5 @@
 .vscode/
+logs/
 .mypy_cache/
 __pycache__/
 pics/Thumbs.db

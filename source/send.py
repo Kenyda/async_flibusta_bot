@@ -325,7 +325,8 @@ class Sender:
             annotation = await BookAnnotation.get_by_book_id(book_id)
             if annotation.photo_link:
                 msg = await cls.bot.send_photo(msg.chat.id, annotation.photo_link,
-                                               caption=annotation.to_send[:1024], parse_mode="HTML")
+                                               caption=annotation.to_send[:1024], parse_mode="HTML",
+                                               reply_to_message_id=msg.message_id)
                 if len(annotation.to_send) > 1024:
                     i = 1024
                     while annotation.to_send[i:i + 4096]:
@@ -354,7 +355,8 @@ class Sender:
             annotation = await AuthorAnnotation.get_by_author_id(author_id)
             if annotation.photo_link:
                 await cls.try_reply_or_send_photo(msg.chat.id, annotation.photo_link,
-                                                  caption=annotation.to_send[:1024], parse_mode="HTML")
+                                                  caption=annotation.to_send[:1024], parse_mode="HTML",
+                                                  reply_to_message_id=msg.message_id)
                 if len(annotation.to_send) > 1024:
                     i = 1024
                     while annotation.to_send[i:i + 4096]:

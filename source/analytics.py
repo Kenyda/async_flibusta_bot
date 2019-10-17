@@ -13,7 +13,7 @@ def _analyze(message: str, intent: str, user_id: Union[int, str]):
         platform="telegram",
         message=message,
         intent=intent,
-        user_id=user_id if type(user_id) == str else str(user_id),
+        user_id=user_id if isinstance(user_id, str) else str(user_id),
         version="3"
     ).send()
 

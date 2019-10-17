@@ -1,5 +1,4 @@
 import os
-import fire
 from config import Config
 
 

@@ -1,11 +1,9 @@
 import typing
 from typing import Optional
-import asyncio
 from functools import wraps
 
 import transliterate as transliterate
 from aiogram import Bot, types, exceptions
-from aiogram import exceptions
 from aiogram.bot import api
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, base
 from aiogram.utils.payload import prepare_file, prepare_arg, generate_payload

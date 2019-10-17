@@ -9,7 +9,6 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 application = get_wsgi_application()
 
 from db.models import *
-from django.db.models import ObjectDoesNotExist
 
 from aioify import aioify
 from aiogram import types

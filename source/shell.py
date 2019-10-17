@@ -4,6 +4,7 @@ import sys
 
 from config import Config
 
+
 if __name__ == "__main__":
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
     try:
@@ -17,4 +18,3 @@ if __name__ == "__main__":
     sys.argv = [sys.argv[0], "shell"]
     while True:
         execute_from_command_line([sys.argv[0]] + input("CMD: ").split(" "))
-        

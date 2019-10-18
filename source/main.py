@@ -7,7 +7,7 @@ import analytics
 import strings
 from filters import CallbackDataRegExFilter, InlineQueryRegExFilter, IsTextMessageFilter
 from config import Config
-from flibusta_server import Book
+from flibusta_server import Book, NoContent
 from send import Sender
 from async_django import update_user, get_telegram_user_settings, save_settings
 from utils import ignore, make_settings_keyboard
@@ -261,23 +261,21 @@ async def remove_cache(callback: types.CallbackQuery):
 @dp.inline_handler(InlineQueryRegExFilter(r'^share_([\d]+)$'))
 @ignore(exceptions.BotBlocked)
 @ignore(exceptions.InvalidQueryID)
+@ignore(NoContent)
 async def share_book(query: types.InlineQuery):
     async with analytics.Analyze("share_book", query):
         book_id = int(query.query.split("_")[1])
-        try:
-            book = await Book.get_by_id(book_id)
-            await bot.answer_inline_query(query.id, [types.InlineQueryResultArticle(
-                id=str(query.query),
-                title=strings.share,
-                description=book.short_info,
-                input_message_content=types.InputTextMessageContent(
-                    book.share_text,
-                    parse_mode="markdown",
-                    disable_web_page_preview=True
-                )
-            )])
-        except flibusta_server.NoContent:
-            pass
+        book = await Book.get_by_id(book_id)
+        await bot.answer_inline_query(query.id, [types.InlineQueryResultArticle(
+            id=str(query.query),
+            title=strings.share,
+            description=book.short_info,
+            input_message_content=types.InputTextMessageContent(
+                book.share_text,
+                parse_mode="markdown",
+                disable_web_page_preview=True
+            )
+        )])
 
 
 async def on_startup(dp):

@@ -1,47 +1,78 @@
 import pathlib
+from abc import ABC
+from typing import Type, Union
 
 import asyncpg
+from aiogram.types import User, CallbackQuery
 
 from config import Config
 
 
+async def prepare_db():
+    pool = await asyncpg.create_pool()  # TODO: add args
+
+    for _class in [TablesCreator, TelegramUserDB, SettingDB, PostedBookDB]:  # type: Type[ConfugrableDB]
+        _class.configurate(pool)
+
 SQL_FOLDER = pathlib.Path("./sql")
 
 
-class Requests:
-    create_telegram_user_table = open(SQL_FOLDER / "create_telegram_user_table.sql").read().format(Config.DB_USER)
-    create_setting_table = open(SQL_FOLDER / "create_setting_table.sql").read().format(Config.DB_USER)
-    create_posted_book_table = open(SQL_FOLDER / "create_posted_book_table.sql").read().format(Config.DB_USER)
+class ConfigurableDB(ABC):
+    pool: asyncpg.pool.Pool
+
+    @classmethod
+    def configurate(cls, pool: asyncpg.pool.Pool):
+        cls.pool = pool
 
 
-async def create_telegram_user_table(pool: asyncpg.pool.Pool):
-    async with pool.acquire() as conn:
-        await conn.execute(Requests.create_telegram_user_table)
+class TablesCreator(ConfigurableDB):
+    CREATE_TELEGRAM_USER_TABLE = open(SQL_FOLDER / "create_telegram_user_table.sql").read().format(Config.DB_USER)
+    CREATE_SETTING_TABLE = open(SQL_FOLDER / "create_setting_table.sql").read().format(Config.DB_USER)
+    CREATE_POSTED_BOOK_TABLE = open(SQL_FOLDER / "create_posted_book_table.sql").read().format(Config.DB_USER)
+
+    @classmethod
+    async def create_telegram_user_table(cls):
+        async with cls.pool.acquire() as conn:
+            await conn.execute(cls.CREATE_TELEGRAM_USER_TABLE)
+
+    @classmethod
+    async def create_setting_table(cls):
+        async with cls.pool.acquire() as conn:
+            await conn.execute(cls.CREATE_SETTING_TABLE)
+
+    @classmethod
+    async def create_posted_book_table(cls):
+        async with cls.pool.acquire() as conn:
+            await conn.execute(cls.CREATE_POSTED_BOOK_TABLE)
+
+    @classmethod
+    async def create_tables(cls):
+        await cls.create_telegram_user_table()
+        await cls.create_setting_table()
+        await cls.create_posted_book_table()
 
 
-async def create_setting_table(pool: asyncpg.pool.Pool):
-    async with pool.acquire() as conn:
-        await conn.execute(Requests.create_setting_table)
+class TelegramUserDB(ConfigurableDB):
+    @classmethod
+    async def create_or_update(cls, obj: Union[User, CallbackQuery]):
+        pass
 
 
-async def create_posted_book_table(pool: asyncpg.pool.Pool):
-    async with pool.acquire() as conn:
-        await conn.execute(Requests.create_posted_book_table)
+class SettingDB(ConfigurableDB):
+    @classmethod
+    async def get_or_create(cls):
+        pass
+
+    @classmethod
+    async def update(cls):
+        pass
 
 
-async def create_tables(pool: asyncpg.pool.Pool):
-    await create_telegram_user_table(pool)
-    await create_setting_table(pool)
-    await create_posted_book_table(pool)
+class PostedBookDB(ConfigurableDB):
+    @classmethod
+    async def get(cls):
+        pass
 
-
-class TelegramUserDB:
-    pass
-
-
-class SettingDB:
-    pass
-
-
-class PostedBookDB:
-    pass
+    @classmethod
+    async def create_or_update(cls):
+        pass

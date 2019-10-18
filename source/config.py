@@ -9,19 +9,19 @@ class Config:
     DB_NAME: str
     DB_USER: str
     DB_PASSWORD: str
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
+    DB_HOST: str
+    DB_PORT: int
 
-    FLIBUSTA_SERVER: str = "http://localhost:7770"
+    FLIBUSTA_SERVER: str
     FLIBUSTA_SERVER_PUBLIC: str
 
-    WEBHOOK_PORT: int = 8443
+    WEBHOOK_PORT: int
     WEBHOOK_HOST: str
 
-    SERVER_HOST: str = "0.0.0.0"
+    SERVER_HOST: str
     SERVER_PORT: int
 
-    REDIS_HOST: str = "0.0.0.0"
+    REDIS_HOST: str
     REDIS_PASSWORD: str
     
     FLIBUSTA_BOOKS_CHANNEL_ID: str
@@ -35,7 +35,7 @@ class Config:
                  redis_host: str,
                  redis_password: str,
                  chatbase_api_key: str,
-                 webhook_port: int = 8443, server_host: str = "0.0.0.0",
+                 webhook_port: int = 8443, server_host: str = "localhost",
                  flibusta_server: str = "http://localhost:7770",
                  db_host: str = "localhost", db_port: int = 5432,
                  flibusta_books_channel_id=None):

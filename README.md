@@ -1,6 +1,6 @@
 # Flibusta Bot
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/c33982edf5b9454aa4b11720b4b2bd37)](https://www.codacy.com/app/Kurbezz/flibusta_bot?utm_source=github.com&utm_medium=referral&utm_content=Kurbezz/flibusta_bot&utm_campaign=badger)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/e457160fdaf545cc8a031bb14146204c)](https://www.codacy.com/manual/Kurbezz/async_flibusta_bot?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=Kurbezz/async_flibusta_bot&amp;utm_campaign=Badge_Grade)
 
 Этот бот для загрузки книг с сайта Флибуста.
 Попробовать можно тут: [@flibusta_rebot](https://www.t.me/flibusta_rebot)
@@ -14,10 +14,10 @@
 
 ## Скриншоты
 
-![](/pics/screenshot_1.jpg) | ![](/pics/screenshot_2.jpg) | ![](/pics/screenshot_3.jpg)
+![](/pics/screenshot_1.jpg) | ![](/pics/screenshot_2.jpg) | ![](/pics/screenshot_3.jpg) |
 -|-|-
-![](/pics/screenshot_4.jpg) | ![](/pics/screenshot_5.jpg) | ![](/pics/screenshot_6.jpg)
-![](/pics/screenshot_7.jpg) | ![](/pics/screenshot_9.jpg) | ![](/pics/screenshot_10.jpg)
+![](/pics/screenshot_4.jpg) | ![](/pics/screenshot_5.jpg) | ![](/pics/screenshot_6.jpg) |
+![](/pics/screenshot_7.jpg) | ![](/pics/screenshot_9.jpg) | ![](/pics/screenshot_10.jpg) |
 
 ## Настройка
 ### 1. Настройка бота

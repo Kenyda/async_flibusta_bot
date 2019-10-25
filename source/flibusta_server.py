@@ -506,11 +506,13 @@ class UpdateLog:
         return self.count != 0
 
     @staticmethod
-    async def get_by_day(day: date, allowed_langs: List[str], limit: int, page: int) -> Optional["UpdateLog"]:
-        log_date = day.isoformat()
+    async def get_by_day(start_date: date, end_date: date, 
+                         allowed_langs: List[str], limit: int, page: int) -> Optional["UpdateLog"]:
+        start_date = start_date.isoformat()
+        end_date = end_date.isoformat()
         async with aiohttp.request(
             "GET", 
-            f"{Config.FLIBUSTA_SERVER}/book/update_log/{log_date}/{json.dumps(allowed_langs)}/{limit}/{page}"
+            f"{Config.FLIBUSTA_SERVER}/book/update_log_range/{start_date}/{end_date}/{json.dumps(allowed_langs)}/{limit}/{page}"
                 ) as response:
             if response.status != 200:
                 return None

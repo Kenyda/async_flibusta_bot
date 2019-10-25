@@ -386,14 +386,18 @@ class Sender:
 
     @classmethod
     @need_one_or_more_langs
-    async def send_day_update_log(cls, msg: types.Message, day: date, page: int):
-        update_log = await UpdateLog.get_by_day(day, (await SettingsDB.get(msg.chat.id)).get(), 7, page)
+    async def send_day_update_log(cls, msg: types.Message, start_date: date, end_date: date, page: int, type_: str):
+        update_log = await UpdateLog.get_by_day(start_date, end_date, (await SettingsDB.get(msg.chat.id)).get(), 7, page)
         if not update_log:
             await cls.bot.edit_message_text('Обновления не найдены!', chat_id=msg.chat.id, message_id=msg.message_id)
             return
         page_count = update_log.count // ELEMENTS_ON_PAGE + (1 if update_log.count % ELEMENTS_ON_PAGE != 0 else 0)
-        msg_text = f'Обновления за {day.isoformat()}\n\n'
+        if start_date == end_date:
+            msg_text = f'Обновления за {start_date.isoformat()}\n\n'
+        else:
+            msg_text = f'Обновления за {start_date.isoformat()} - {end_date.isoformat()}\n\n'
         msg_text += ''.join(book.to_send_book for book in update_log.books) \
                    + f'<code>Страница {page}/{page_count}</code>'
         await cls.bot.edit_message_text(msg_text, chat_id=msg.chat.id, message_id=msg.message_id, parse_mode='HTML',
-                                        reply_markup=await get_keyboard(page, page_count, f'ul_d_{day.isoformat()}'))
+                                        reply_markup=await get_keyboard(page, page_count, 
+                                        f'ul_{type_}_{start_date.isoformat()}_{end_date.isoformat()}'))

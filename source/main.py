@@ -247,24 +247,27 @@ async def remove_cache(callback: types.CallbackQuery):
 async def get_update_log_message(msg: types.Message):
     async with analytics.Analyze("get_update_log_message", msg):
         await TelegramUserDB.create_or_update(msg)
-        last_date = (date.today() - timedelta(days=1)).isoformat()
+        end_date = (date.today() - timedelta(days=1)).isoformat()
+        start_date_3 = (date.today() - timedelta(days=4)).isoformat()
+        start_date_7 = (date.today() - timedelta(days=8)).isoformat()
+        start_date_30 = (date.today() - timedelta(days=31)).isoformat()
         keyboard = types.InlineKeyboardMarkup(row_width=1)
         keyboard.add(
-            types.InlineKeyboardButton("За день", callback_data=f"ul_d_{last_date}_1"),
-            types.InlineKeyboardButton("За неделю (Пока не работает!)", callback_data=f"ul_w_{last_date}_1"),
-            types.InlineKeyboardButton("За месяц (Пока не работает!)", callback_data=f"ul_m_{last_date}_1")
+            types.InlineKeyboardButton("За 1 день", callback_data=f"ul_d_{end_date}_{end_date}_1"),
+            types.InlineKeyboardButton("За 3 дня", callback_data=f"ul_t_{start_date_3}_{end_date}_1"),
+            types.InlineKeyboardButton("За 7 дней", callback_data=f"ul_w_{start_date_7}_{end_date}_1"),
+            types.InlineKeyboardButton("За 30 дней", callback_data=f"ul_m_{start_date_30}_{end_date}_1")
         )
         await msg.reply("Обновления за: ", reply_markup=keyboard)
 
 
-@dp.callback_query_handler(CallbackDataRegExFilter('^ul_d_([0-9]{4}-[0-9]{2}-[0-9]{2})_([0-9])+$'))
-async def get_day_update_log(callback: types.CallbackQuery):
+@dp.callback_query_handler(CallbackDataRegExFilter('^ul_[dtwm]_([0-9]{4}-[0-9]{2}-[0-9]{2})_([0-9]{4}-[0-9]{2}-[0-9]{2})_([0-9])+$'))
+async def get_day_update_log_range(callback: types.CallbackQuery):
     async with analytics.Analyze("get_update_log", callback):
         msg: types.Message = callback.message
-        raw_log_date, page = callback.data.replace("ul_d_", "").split("_")
-        log_date = date.fromisoformat(raw_log_date)
+        type_, raw_start_date, raw_end_date, page = callback.data[3:].split("_")
         await TelegramUserDB.create_or_update(callback)
-        await Sender.send_day_update_log(msg, log_date, int(page))
+        await Sender.send_day_update_log(msg, date.fromisoformat(raw_start_date), date.fromisoformat(raw_end_date), int(page), type_)
 
 
 @dp.message_handler(IsTextMessageFilter())

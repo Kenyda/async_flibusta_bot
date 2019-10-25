@@ -1,0 +1,1 @@
+SELECT * from settings WHERE user_id = $1;

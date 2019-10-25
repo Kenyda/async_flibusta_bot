@@ -1,0 +1,1 @@
+DELETE FROM posted_book WHERE book_id = $1 AND file_type = cast($2 AS VARCHAR);

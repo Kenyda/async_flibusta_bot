@@ -1,0 +1,2 @@
+INSERT INTO telegram_user (user_id, first_name, last_name, username) VALUES ($1, cast($2 AS VARCHAR), cast($3 AS VARCHAR), cast($4 AS VARCHAR))
+ON CONFLICT (user_id) DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, username = EXCLUDED.username;

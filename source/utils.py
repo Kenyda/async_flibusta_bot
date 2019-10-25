@@ -1,6 +1,7 @@
+from db import SettingsDB
+
 import asyncio
 from aiogram import types
-from async_django import get_telegram_user_settings
 
 from functools import wraps
 
@@ -26,7 +27,7 @@ def ignore(exception):
 
 
 async def make_settings_keyboard(user_id: int) -> types.InlineKeyboardMarkup:
-    settings = await get_telegram_user_settings(user_id)
+    settings = await SettingsDB.get(user_id)
     keyboard = types.InlineKeyboardMarkup()
     if not settings.allow_ru:
         keyboard.row(types.InlineKeyboardButton("Русский: 🅾 выключен!", callback_data="ru_on"))

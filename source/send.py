@@ -1,6 +1,7 @@
 import typing
 from typing import Optional
 from functools import wraps
+from datetime import date
 
 import transliterate as transliterate
 from aiogram import Bot, types, exceptions
@@ -8,13 +9,12 @@ from aiogram.bot import api
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, base
 from aiogram.utils.payload import prepare_file, prepare_arg, generate_payload
 import aioredis
-from flibusta_server import Book, Author, Sequence, BookAnnotation, NoContent, AuthorAnnotation
+from flibusta_server import Book, Author, Sequence, BookAnnotation, NoContent, AuthorAnnotation, UpdateLog
 from notifier import Notifier
 
-from async_django import delete_posted_book, get_allowed_langs, get_posted_book, create_posted_book
 from config import Config
 
-from django.db.models import ObjectDoesNotExist
+from db import *
 
 ELEMENTS_ON_PAGE = 7
 BOOKS_CHANGER = 5
@@ -72,7 +72,7 @@ def need_one_or_more_langs(fn):
                 break
         if msg is None:
             raise Exception("Message not found!")
-        allowed_langs = await get_allowed_langs(msg.chat.id)
+        allowed_langs = (await SettingsDB.get(msg.chat.id)).get()
         if not allowed_langs:
             return await Sender.try_reply_or_send_message(msg.chat.id, "Нужно выбрать хотя бы один язык! /settings",
                                                           reply_to_message_id=msg.message_id)
@@ -137,7 +137,7 @@ class Sender:
 
     @staticmethod
     async def remove_cache(type_: str, id_: int):
-        await delete_posted_book(type_, id_)
+        await PostedBookDB.delete(id_, type_)
 
     @classmethod
     async def send_book(cls, msg: Message, book_id: int, file_type: str):
@@ -157,15 +157,15 @@ class Sender:
                     return await book_msg.reply(book.caption, reply_markup=book.share_markup_without_cache)
                 except exceptions.MessageToForwardNotFound:
                     pass  # ToDO: remove message from redis
-            try:
-                pb = await get_posted_book(book_id, file_type)
+            pb = await PostedBookDB.get(book_id, file_type)
+            if pb:
                 try:
                     await cls.bot.send_document(msg.chat.id, pb.file_id, reply_to_message_id=msg.message_id,
                                                  caption=book.caption, reply_markup=book.share_markup)
                 except exceptions.BadRequest:
                     await cls.bot.send_document(msg.chat.id, pb.file_id,
                                                  caption=book.caption, reply_markup=book.share_markup)
-            except ObjectDoesNotExist:
+            else:
                 book_bytes = await Book.download(book_id, file_type)
                 if not book_bytes:
                     return await cls.try_reply_or_send_message(msg.chat.id, 
@@ -190,14 +190,14 @@ class Sender:
                     book_bytes = book_bytes.get_copy()
                     send_response = await cls.bot.send_document(msg.chat.id, book_bytes,
                                                                 caption=book.caption, reply_markup=book.share_markup)
-                await create_posted_book(book_id, file_type, send_response.document.file_id)
+                await PostedBookDB.create_or_update(book_id, file_type, send_response.document.file_id)
 
     @classmethod
     @need_one_or_more_langs
     async def search_books(cls, msg: Message, page: int):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
-        search_result = await Book.search(msg.reply_to_message.text, 
-                                          await get_allowed_langs(msg.chat.id), 
+        search_result = await Book.search(msg.reply_to_message.text,
+                                          (await SettingsDB.get(msg.chat.id)).get(), 
                                           ELEMENTS_ON_PAGE, page)
         if not search_result:
             await cls.bot.edit_message_text('Книги не найдены!', chat_id=msg.chat.id, message_id=msg.message_id)
@@ -213,7 +213,7 @@ class Sender:
     async def search_authors(cls, msg: Message, page: int):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
         search_result = await Author.search(msg.reply_to_message.text, 
-                                            await get_allowed_langs(msg.chat.id), 
+                                            (await SettingsDB.get(msg.chat.id)).get(), 
                                             ELEMENTS_ON_PAGE, page)
         if not search_result:
             await cls.bot.edit_message_text('Автор не найден!', chat_id=msg.chat.id, message_id=msg.message_id)
@@ -229,7 +229,7 @@ class Sender:
     async def search_books_by_author(cls, msg: Message, author_id: int, page: int):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
         try:
-            author = await Author.by_id(author_id, await get_allowed_langs(msg.chat.id), ELEMENTS_ON_PAGE, page)
+            author = await Author.by_id(author_id, (await SettingsDB.get(msg.chat.id)).get(), ELEMENTS_ON_PAGE, page)
         except NoContent:
             return await msg.reply("Автор не найден!")
         books = author.books
@@ -258,7 +258,7 @@ class Sender:
     async def search_series(cls, msg: Message, page: int):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
         sequences_result = await Sequence.search(msg.reply_to_message.text, 
-                                                 await get_allowed_langs(msg.chat.id), 
+                                                 (await SettingsDB.get(msg.chat.id)).get(), 
                                                  ELEMENTS_ON_PAGE, page)
         if not sequences_result:
             return await cls.try_reply_or_send_message(msg.chat.id, 'Ошибка! Серии не найдены!',
@@ -274,7 +274,7 @@ class Sender:
     @need_one_or_more_langs
     async def search_books_by_series(cls, msg: Message, series_id: int, page: int):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
-        search_result = await Sequence.get_by_id(series_id, await get_allowed_langs(msg.chat.id), ELEMENTS_ON_PAGE, page)
+        search_result = await Sequence.get_by_id(series_id, (await SettingsDB.get(msg.chat.id)).get(), ELEMENTS_ON_PAGE, page)
         books = search_result.books
         if not books:
             return await cls.try_reply_or_send_message(msg.chat.id, 'Ошибка! Книги в серии не найдены!',
@@ -295,25 +295,34 @@ class Sender:
     @need_one_or_more_langs
     async def get_random_book(cls, msg: Message):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
-        book = await Book.get_random(await get_allowed_langs(msg.chat.id))
-        await cls.try_reply_or_send_message(msg.chat.id, book.to_send_book, parse_mode='HTML',
-                                            reply_to_message_id=msg.message_id)
+        try:
+            book = await Book.get_random((await SettingsDB.get(msg.chat.id)).get())
+            await cls.try_reply_or_send_message(msg.chat.id, book.to_send_book, parse_mode='HTML',
+                                                reply_to_message_id=msg.message_id)
+        except NoContent:
+            await cls.try_reply_or_send_message(msg.chat.id, "Пока бот не может это сделать, но скоро это исправят!")
 
     @classmethod
     @need_one_or_more_langs
     async def get_random_author(cls, msg: Message):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
-        author = await Author.get_random(await get_allowed_langs(msg.chat.id))
-        await cls.try_reply_or_send_message(msg.chat.id, author.to_send, parse_mode='HTML',
-                                            reply_to_message_id=msg.message_id)
+        try:
+            author = await Author.get_random((await SettingsDB.get(msg.chat.id)).get())
+            await cls.try_reply_or_send_message(msg.chat.id, author.to_send, parse_mode='HTML',
+                                                reply_to_message_id=msg.message_id)
+        except NoContent:
+            await cls.try_reply_or_send_message(msg.chat.id, "Пока бот не может это сделать, но скоро это исправят!")
 
     @classmethod
     @need_one_or_more_langs
     async def get_random_sequence(cls, msg: Message):
         await cls.bot.send_chat_action(msg.chat.id, 'typing')
-        sequence = await Sequence.get_random(await get_allowed_langs(msg.chat.id))
-        await cls.try_reply_or_send_message(msg.chat.id, sequence.to_send, parse_mode="HTML",
-                                            reply_to_message_id=msg.message_id)
+        try:
+            sequence = await Sequence.get_random((await SettingsDB.get(msg.chat.id)).get())
+            await cls.try_reply_or_send_message(msg.chat.id, sequence.to_send, parse_mode="HTML",
+                                                reply_to_message_id=msg.message_id)
+        except NoContent:
+            await cls.try_reply_or_send_message(msg.chat.id, "Пока бот не может это сделать, но скоро это исправят!")
 
     @classmethod
     @need_one_or_more_langs
@@ -373,3 +382,18 @@ class Sender:
         except NoContent:
             await cls.try_reply_or_send_message(msg.chat.id, "Нет информации для этого автора!",
                                                 reply_to_message_id=msg.message_id)
+
+
+    @classmethod
+    @need_one_or_more_langs
+    async def send_day_update_log(cls, msg: types.Message, day: date, page: int):
+        update_log = await UpdateLog.get_by_day(day, (await SettingsDB.get(msg.chat.id)).get(), 7, page)
+        if not update_log:
+            await cls.bot.edit_message_text('Обновления не найдены!', chat_id=msg.chat.id, message_id=msg.message_id)
+            return
+        page_count = update_log.count // ELEMENTS_ON_PAGE + (1 if update_log.count % ELEMENTS_ON_PAGE != 0 else 0)
+        msg_text = f'Обновления за {day.isoformat()}\n\n'
+        msg_text += ''.join(book.to_send_book for book in update_log.books) \
+                   + f'<code>Страница {page}/{page_count}</code>'
+        await cls.bot.edit_message_text(msg_text, chat_id=msg.chat.id, message_id=msg.message_id, parse_mode='HTML',
+                                        reply_markup=await get_keyboard(page, page_count, f'ul_d_{day.isoformat()}'))

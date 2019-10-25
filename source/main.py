@@ -1,4 +1,5 @@
 import re
+from datetime import date, timedelta
 
 from aiogram import Bot, Dispatcher, types, filters, exceptions
 from aiogram.utils.executor import start_webhook
@@ -9,7 +10,7 @@ from filters import CallbackDataRegExFilter, InlineQueryRegExFilter, IsTextMessa
 from config import Config
 from flibusta_server import Book, NoContent
 from send import Sender
-from async_django import update_user, get_telegram_user_settings, save_settings
+from db import *
 from utils import ignore, make_settings_keyboard
 
 
@@ -23,7 +24,7 @@ Sender.configure(bot)
 @ignore(exceptions.BotBlocked)
 @ignore(exceptions.BadRequest)
 async def start_handler(msg: types.Message):
-    await update_user(msg)
+    await TelegramUserDB.create_or_update(msg)
     try:
         await analytics.analyze(msg.text, "get_shared_book", msg.from_user.id)
         file_type, book_id = (msg["text"].split(' ')[1].split("_"))
@@ -62,7 +63,7 @@ async def vote_handler(msg: types.Message):
 @ignore(exceptions.BadRequest)
 async def settings(msg: types.Message):
     async with analytics.Analyze("settings", msg):
-        await update_user(msg)
+        await TelegramUserDB.create_or_update(msg)
         await msg.reply("Настройки: ", reply_markup=await make_settings_keyboard(msg.from_user.id))
 
 
@@ -71,8 +72,8 @@ async def settings(msg: types.Message):
 @ignore(exceptions.BadRequest)
 async def lang_setup(query: types.CallbackQuery):
     async with analytics.Analyze("settings_change", query):
-        await update_user(query)
-        settings = await get_telegram_user_settings(query.message.chat.id)
+        await TelegramUserDB.create_or_update(query)
+        settings = await SettingsDB.get(query.from_user.id)
         lang, set_ = query.data.split('_')
         if lang == "uk":
             settings.allow_uk = (set_ == "on")
@@ -80,7 +81,7 @@ async def lang_setup(query: types.CallbackQuery):
             settings.allow_be = (set_ == "on")
         if lang == "ru":
             settings.allow_ru = (set_ == "on")
-        await save_settings(settings)
+        await SettingsDB.update(settings)
         keyboard = await make_settings_keyboard(query.from_user.id)
         await bot.edit_message_reply_markup(chat_id=query.message.chat.id, message_id=query.message.message_id,
                                             reply_markup=keyboard)
@@ -92,7 +93,7 @@ async def lang_setup(query: types.CallbackQuery):
 @ignore(exceptions.MessageCantBeEdited)
 async def search_books_by_author(msg: types.Message):
     async with analytics.Analyze("get_books_by_author", msg):
-        await update_user(msg)
+        await TelegramUserDB.create_or_update(msg)
         await Sender.search_books_by_author(msg, int(msg.text.split('_')[1]), 1)
 
 
@@ -101,7 +102,7 @@ async def search_books_by_author(msg: types.Message):
 @ignore(exceptions.MessageCantBeEdited)
 async def search_book_by_series(msg: types.Message):
     async with analytics.Analyze("get_book_by_series", msg):
-        await update_user(msg)
+        await TelegramUserDB.create_or_update(msg)
         await Sender.search_books_by_series(msg, int(msg.text.split("_")[1]), 1)
 
 
@@ -110,7 +111,7 @@ async def search_book_by_series(msg: types.Message):
 @ignore(exceptions.BadRequest)
 async def get_random_book(msg: types.Message):
     async with analytics.Analyze("get_random_book", msg):
-        await update_user(msg)
+        await TelegramUserDB.create_or_update(msg)
         await Sender.get_random_book(msg)
 
 
@@ -119,7 +120,7 @@ async def get_random_book(msg: types.Message):
 @ignore(exceptions.BadRequest)
 async def get_random_author(msg: types.Message):
     async with analytics.Analyze("get_random_author", msg):
-        await update_user(msg)
+        await TelegramUserDB.create_or_update(msg)
         await Sender.get_random_author(msg)
 
 
@@ -128,7 +129,7 @@ async def get_random_author(msg: types.Message):
 @ignore(exceptions.BadRequest)
 async def get_random_series(msg: types.Message):
     async with analytics.Analyze("get_random_series", msg):
-        await update_user(msg)
+        await TelegramUserDB.create_or_update(msg)
         await Sender.get_random_sequence(msg)
 
 
@@ -165,22 +166,6 @@ async def get_author_annotation(msg: types.Message):
         author_id = int(msg.text.split("/a_info_")[1])
         await Sender.send_author_annotation(msg, author_id)
 
-
-@dp.message_handler(IsTextMessageFilter())
-@ignore(exceptions.BotBlocked)
-@ignore(exceptions.BadRequest)
-async def search(msg: types.Message):
-    async with analytics.Analyze("new_search_query", msg):
-        await update_user(msg)
-        keyboard = types.InlineKeyboardMarkup()
-        keyboard.row(
-            types.InlineKeyboardButton("По названию", callback_data="b_1")
-        )
-        keyboard.row(
-            types.InlineKeyboardButton("По авторам", callback_data="a_1"),
-            types.InlineKeyboardButton("По сериям", callback_data="s_1")
-        )
-    await msg.reply("Поиск: ", reply_markup=keyboard)
 
 @dp.callback_query_handler(CallbackDataRegExFilter(r'^b_([0-9]+)'))
 @ignore(exceptions.BotBlocked)
@@ -227,7 +212,7 @@ async def get_books_by_author(callback: types.CallbackQuery):
         msg: types.Message = callback.message
         if not msg.reply_to_message or not msg.reply_to_message.text:
             return await msg.reply("Ошибка :( Попробуйте еще раз!")
-        await update_user(msg.reply_to_message)
+        await TelegramUserDB.create_or_update(msg.reply_to_message)
         await Sender.search_books_by_author(msg, int(msg.reply_to_message.text.split('_')[1]),
                                             int(callback.data.split('_')[1]))
 
@@ -241,7 +226,7 @@ async def get_books_by_series(callback: types.CallbackQuery):
         msg: types.Message = callback.message
         if not msg.reply_to_message or not msg.reply_to_message.text:
             return await msg.reply("Ошибка :( Попробуйте еще раз!")
-        await update_user(msg.reply_to_message)
+        await TelegramUserDB.create_or_update(msg.reply_to_message)
         await Sender.search_books_by_series(msg, int(msg.reply_to_message.text.split("_")[1]),
                                             int(callback.data.split('_')[1]))
 
@@ -256,6 +241,47 @@ async def remove_cache(callback: types.CallbackQuery):
         file_type, book_id = reply_to.text.replace('/', '').split('_')
         await Sender.remove_cache(file_type, int(book_id))
         await Sender.send_book(reply_to, int(book_id), file_type)
+
+
+@dp.message_handler(commands=['update_log'])
+async def get_update_log_message(msg: types.Message):
+    async with analytics.Analyze("get_update_log_message", msg):
+        await TelegramUserDB.create_or_update(msg)
+        last_date = (date.today() - timedelta(days=1)).isoformat()
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
+        keyboard.add(
+            types.InlineKeyboardButton("За день", callback_data=f"ul_d_{last_date}_1"),
+            types.InlineKeyboardButton("За неделю (Пока не работает!)", callback_data=f"ul_w_{last_date}_1"),
+            types.InlineKeyboardButton("За месяц (Пока не работает!)", callback_data=f"ul_m_{last_date}_1")
+        )
+        await msg.reply("Обновления за: ", reply_markup=keyboard)
+
+
+@dp.callback_query_handler(CallbackDataRegExFilter('^ul_d_([0-9]{4}-[0-9]{2}-[0-9]{2})_([0-9])+$'))
+async def get_day_update_log(callback: types.CallbackQuery):
+    async with analytics.Analyze("get_update_log", callback):
+        msg: types.Message = callback.message
+        raw_log_date, page = callback.data.replace("ul_d_", "").split("_")
+        log_date = date.fromisoformat(raw_log_date)
+        await TelegramUserDB.create_or_update(callback)
+        await Sender.send_day_update_log(msg, log_date, int(page))
+
+
+@dp.message_handler(IsTextMessageFilter())
+@ignore(exceptions.BotBlocked)
+@ignore(exceptions.BadRequest)
+async def search(msg: types.Message):
+    async with analytics.Analyze("new_search_query", msg):
+        await TelegramUserDB.create_or_update(msg)
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.row(
+            types.InlineKeyboardButton("По названию", callback_data="b_1")
+        )
+        keyboard.row(
+            types.InlineKeyboardButton("По авторам", callback_data="a_1"),
+            types.InlineKeyboardButton("По сериям", callback_data="s_1")
+        )
+        await msg.reply("Поиск: ", reply_markup=keyboard)
 
 
 @dp.inline_handler(InlineQueryRegExFilter(r'^share_([\d]+)$'))
@@ -279,6 +305,7 @@ async def share_book(query: types.InlineQuery):
 
 
 async def on_startup(dp):
+    await prepare_db()
     await bot.set_webhook(Config.WEBHOOK_HOST + "/")
 
 
@@ -296,4 +323,3 @@ if __name__ == "__main__":
         host=Config.SERVER_HOST,
         port=Config.SERVER_PORT
     )
-    # executor.start_polling(dp, skip_updates=False)

@@ -1,5 +1,8 @@
+# TODO: refactor all
+
 import io
 from typing import List, Optional
+from datetime import date
 
 import aiohttp
 from aiohttp import ClientTimeout, ServerDisconnectedError
@@ -40,42 +43,64 @@ class BytesResult(io.BytesIO):
 
 
 class AuthorSearchResult:
-    def __init__(self, authors, count):
-        self.authors: List[Author] = authors
-        self.count: int = count
+    authors: List["Author"]
+
+    def __init__(self, obj: dict):
+        self.count: int = obj["count"]
+
+        if self.count != 0:
+            self.authors = [Author(a) for a in obj["result"]]
+        else:
+            self.authors = []
 
     def __bool__(self):
         return bool(self.count)
 
 
 class BookSearchResult:
-    def __init__(self, books, count):
-        self.books: List[Book] = books
-        self.count: int = count
+    books: List["Book"]
+
+    def __init__(self, obj: dict):
+        self.count: int = obj["count"]
+
+        if self.count != 0:
+            self.books = [Book(b) for b in obj["result"]]
+        else:
+            self.books = []
 
     def __bool__(self):
         return bool(self.count)
 
 
 class SequenceSearchResult:
-    def __init__(self, sequences: List['Sequence'], count):
-        self.sequences: List['Sequence'] = sequences
-        self.count = count
+    sequences: List['Sequence']
+
+    def __init__(self, obj: dict):
+        self.count: int = obj["count"]
+
+        if self.count != 0:
+            self.sequences = [Sequence(s) for s in obj["result"]]
+        else:
+            self.sequences = []
 
     def __bool__(self):
-        return bool(self.count)
+        return self.count != 0
 
 
 class Author:
-    def __init__(self, obj: dict, count=None):
-        self.obj = obj
-        self.count = count
+    def __init__(self, obj: dict):
+        self.count = obj.get("count", None)
+
+        if obj.get("result", None) is None:
+            self.obj = obj
+        else:
+            self.obj = obj["result"]
 
     def __del__(self):
         del self.obj
 
     def __bool__(self):
-        return bool(self.count)
+        return self.count != 0
 
     @property
     def id(self):
@@ -147,19 +172,17 @@ class Author:
                 f"{Config.FLIBUSTA_SERVER}/author/{author_id}/{json.dumps(allowed_langs)}/{limit}/{page}") as response:
             if response.status == 204:
                 raise NoContent
-            response_json = await response.json()
-            return Author(response_json["result"], count=response_json["count"])
+            return Author(await response.json())
 
     @staticmethod
-    async def search(query: str, allowed_langs: List[str], limit: int, page: int) -> AuthorSearchResult:
+    async def search(query: str, allowed_langs: List[str], limit: int, page: int) -> Optional[AuthorSearchResult]:
         async with aiohttp.request(
                 "GET",
                 f"{Config.FLIBUSTA_SERVER}/author/search/{json.dumps(allowed_langs)}/{limit}/{page}/{query}") \
                     as response:
             if response.status != 200:
-                return AuthorSearchResult([], 0)
-            response_json = await response.json()
-            return AuthorSearchResult([Author(a) for a in response_json["result"]], response_json["count"])
+                return None
+            return AuthorSearchResult(await response.json())
 
     @staticmethod
     async def get_random(allowed_langs: List[str]) -> "Author":
@@ -266,7 +289,7 @@ class Book:
             for a in self.authors[:15]:
                 res += f'👤 <b>{a.normal_name}</b>\n'
             if len(self.authors) > 15:
-                res += "  и другие\n"
+                res += "  и другие\n\n"
         else:
             res += '\n'
         if self.file_type == 'fb2':
@@ -292,20 +315,19 @@ class Book:
             return Book(await response.json())
 
     @staticmethod
-    async def search(query: str, allowed_langs: List[str], limit: int, page: int) -> BookSearchResult:
+    async def search(query: str, allowed_langs: List[str], limit: int, page: int) -> Optional[BookSearchResult]:
         async with aiohttp.request(
             "GET",
                 f"{Config.FLIBUSTA_SERVER}/book/search/{json.dumps(allowed_langs)}/{limit}/{page}/{query}"
         ) as response:
             if response.status != 200:
-                return BookSearchResult([], 0)
-            response_json = await response.json()
-            return BookSearchResult([Book(b) for b in response_json["result"]], response_json["count"])
+                return None
+            return BookSearchResult(await response.json())
 
     @staticmethod
     async def get_random(allowed_langs: List[str]) -> "Book":
-        async with aiohttp.request("GET", f"{Config.FLIBUSTA_SERVER}/book/random/{json.dumps(allowed_langs)}"
-                                   ) as response:
+        async with aiohttp.request("GET", 
+                                   f"{Config.FLIBUSTA_SERVER}/book/random/{json.dumps(allowed_langs)}") as response:
             if response.status != 200:
                 raise NoContent
             return Book(await response.json())
@@ -335,7 +357,7 @@ class Sequence:
         self.count = count
 
     def __bool__(self):
-        return bool(self.count)
+        return self.count != 0
 
     @property
     def id(self):
@@ -362,7 +384,7 @@ class Sequence:
             for a in self.authors[:5]:
                 res += f'👤 <b>{a.normal_name}</b>\n'
             if len(self.authors) > 5:
-                res += "<b> и другие</b>\n"
+                res += "<b> и другие</b>\n\n"
         else:
             res += '\n'
         res += f'/s_{self.id}\n\n'
@@ -379,15 +401,14 @@ class Sequence:
             return Sequence(response_json["result"], response_json["count"])
 
     @staticmethod
-    async def search(query: str, allowed_langs: List[str], limit: int, page: int) -> SequenceSearchResult:
+    async def search(query: str, allowed_langs: List[str], limit: int, page: int) -> Optional[SequenceSearchResult]:
         async with aiohttp.request(
                 "GET",
                 f"{Config.FLIBUSTA_SERVER}/sequence/search/{json.dumps(allowed_langs)}/{limit}/{page}/{query}"
         ) as response:
             if response.status != 200:
-                return SequenceSearchResult([], 0)
-            response_json = await response.json()
-            return SequenceSearchResult([Sequence(x) for x in response_json["result"]], response_json['count'])
+                return None
+            return SequenceSearchResult(await response.json())
 
     @staticmethod
     async def get_random(allowed_langs: List[str]) -> "Sequence":
@@ -468,3 +489,29 @@ class AuthorAnnotation:
             if response.status != 200:
                 raise NoContent
             return AuthorAnnotation(await response.json())
+
+
+class UpdateLog:
+    books: List[Book]
+
+    def __init__(self, obj: dict):
+        self.count = obj['count']
+
+        if self.count != 0:
+            self.books = [Book(b) for b in obj["result"]]
+        else:
+            self.books = []
+    
+    def __bool__(self):
+        return self.count != 0
+
+    @staticmethod
+    async def get_by_day(day: date, allowed_langs: List[str], limit: int, page: int) -> Optional["UpdateLog"]:
+        log_date = day.isoformat()
+        async with aiohttp.request(
+            "GET", 
+            f"{Config.FLIBUSTA_SERVER}/book/update_log/{log_date}/{json.dumps(allowed_langs)}/{limit}/{page}"
+                ) as response:
+            if response.status != 200:
+                return None
+            return UpdateLog(await response.json())

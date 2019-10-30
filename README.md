@@ -7,6 +7,7 @@
 Попробовать можно тут: 
 
 Android: [@flibusta_rebot](https://www.t.me/flibusta_rebot)
+
 IOS: [@flibusta_new_copy_rebot](https://www.t.me/flibusta_new_copy_rebot)
 
 ## Возможности
